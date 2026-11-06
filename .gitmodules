@@ -1,0 +1,15 @@
+[submodule "third_party/grub"]
+	path = third_party/grub
+	url = https://gitlab.freedesktop.org/gnu-grub/grub.git
+[submodule "third_party/refsprogs"]
+	path = third_party/refsprogs
+	url = https://github.com/unsound/refsprogs.git
+[submodule "third_party/erofs-utils"]
+	path = third_party/erofs-utils
+	url = https://git.kernel.org/pub/scm/linux/kernel/git/xiang/erofs-utils.git
+[submodule "third_party/lz4"]
+	path = third_party/lz4
+	url = https://github.com/lz4/lz4.git
+[submodule "third_party/efifs"]
+	path = third_party/efifs
+	url = https://github.com/pbatard/efifs.git

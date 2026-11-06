@@ -1,0 +1,7 @@
+{
+  "grub": {"url": "https://gitlab.freedesktop.org/gnu-grub/grub.git", "revision": "cd106688f988b0961cb960f5a6c7e9d6d028b326", "license": "GPL-3.0-or-later"},
+  "refsprogs": {"url": "https://github.com/unsound/refsprogs.git", "revision": "bd9036823aa3bf06de6dc30fecd669712c59c0e9", "license": "GPL-2.0-or-later"},
+  "erofs-utils": {"url": "https://git.kernel.org/pub/scm/linux/kernel/git/xiang/erofs-utils.git", "revision": "f36cadb5c563995ab3aa8572a60ed6b721b9557d", "license": "GPL-2.0-or-later OR MIT"},
+  "lz4": {"url": "https://github.com/lz4/lz4.git", "revision": "ebb370ca83af193212df4dcbadcc5d87bc0de2f0", "license": "BSD-2-Clause"},
+  "efifs": {"url": "https://github.com/pbatard/efifs.git", "revision": "e64895a7ef3ea326ecd39eddd20973e1c8744e1d", "license": "GPL-3.0-or-later; per-file notices", "test_only": true}
+}

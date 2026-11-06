@@ -1,0 +1,56 @@
+set(REFS "${PROJECT_ROOT}/third_party/refsprogs")
+# Generate an isolated userspace adapter; upstream source stays unmodified.
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include/refs")
+file(GLOB REFS_HEADERS "${REFS}/include/refs/*.h")
+foreach(HEADER IN LISTS REFS_HEADERS)
+    get_filename_component(NAME "${HEADER}" NAME)
+    configure_file("${HEADER}" "${CMAKE_CURRENT_BINARY_DIR}/include/refs/${NAME}" COPYONLY)
+endforeach()
+file(READ "${REFS}/include/refs/sys_user.h" SYS_HEADER)
+foreach(NAME pread get_size get_sector_size)
+    string(REPLACE "sys_device_${NAME}" "unused_host_device_${NAME}" SYS_HEADER "${SYS_HEADER}")
+endforeach()
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/device_adapter.h" ADAPTER)
+string(REPLACE "#endif /* !defined(_REFS_SYS_USER_H) */" "${ADAPTER}\n#endif /* !defined(_REFS_SYS_USER_H) */" SYS_HEADER "${SYS_HEADER}")
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/include/refs/sys_user.h" "${SYS_HEADER}")
+# Android 8 has no iconv. Decode comes from upstream; supply a checked UTF-8 encoder.
+file(READ "${REFS}/librefs/sys.c" SYS_SOURCE)
+string(FIND "${SYS_SOURCE}" "int sys_unistr_encode(" ENCODE_START)
+if(ENCODE_START LESS 0)
+    message(FATAL_ERROR "refsprogs sys.c layout changed")
+endif()
+string(SUBSTRING "${SYS_SOURCE}" 0 ${ENCODE_START} SYS_SOURCE)
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/sys_decode.c" "${SYS_SOURCE}")
+# Fix the upstream metadata read coalescer: 64 KiB nodes were read as four
+# 64 KiB clusters into one 64 KiB allocation. The same loop advanced by one
+# cluster after a coalesced read, duplicating data on fragmented 4 KiB nodes.
+# Our block cache already coalesces physical USB traffic; read each node piece once.
+file(READ "${REFS}/librefs/node.c" NODE_SOURCE)
+string(FIND "${NODE_SOURCE}" "\t\t/* Consolidate contiguous block reads. */" COALESCE_START)
+if(COALESCE_START LESS 0)
+    message(FATAL_ERROR "refsprogs metadata loop changed; review bounds patch")
+endif()
+string(SUBSTRING "${NODE_SOURCE}" 0 ${COALESCE_START} NODE_PREFIX)
+string(SUBSTRING "${NODE_SOURCE}" ${COALESCE_START} -1 NODE_SUFFIX)
+string(FIND "${NODE_SUFFIX}" "\t\tsys_log_debug(\"Reading %\"" COALESCE_END)
+string(SUBSTRING "${NODE_SUFFIX}" ${COALESCE_END} -1 NODE_SUFFIX)
+set(NODE_SOURCE "${NODE_PREFIX}${NODE_SUFFIX}")
+string(REPLACE "size_t bytes_to_read = bytes_per_read;"
+    "size_t bytes_to_read = sys_min(bytes_per_read, node_size - bytes_read);\n\t\tif (!bytes_to_read || i >= 4) { err = EIO; goto out; }" NODE_SOURCE "${NODE_SOURCE}")
+string(REPLACE "if(physical_blocks[i]);\n\t\telse for(j = i; j < 4; ++j)" "if(!physical_blocks[i])" NODE_SOURCE "${NODE_SOURCE}")
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/node.c" "${NODE_SOURCE}")
+file(READ "${REFS}/librefs/fsapi.c" API_SOURCE)
+# Byte reads must stop exactly at an extent boundary. Sector-rounding the remaining
+# extent size reads into another physical extent when the requested offset is unaligned.
+set(ROUNDING "\tvalid_extent_size =\n\t\t/* Round up to the nearest sector boundary (this assumes that\n\t\t * sector size is a power of 2!). */\n\t\t(valid_extent_size + (context->vol->sector_size - 1)) &\n\t\t~((u64) (context->vol->sector_size - 1));")
+string(FIND "${API_SOURCE}" "${ROUNDING}" ROUNDING_POS)
+if(ROUNDING_POS LESS 0)
+    message(FATAL_ERROR "refsprogs extent loop changed; review unaligned-read patch")
+endif()
+string(REPLACE "${ROUNDING}" "/* Exact byte range; USB alignment is handled below this API. */" API_SOURCE "${API_SOURCE}")
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/fsapi.c" "${API_SOURCE}")
+add_library(refsfs STATIC "${CMAKE_CURRENT_BINARY_DIR}/fsapi.c" "${CMAKE_CURRENT_BINARY_DIR}/node.c"
+    "${REFS}/librefs/volume.c" "${REFS}/librefs/rb_tree.c" "${CMAKE_CURRENT_BINARY_DIR}/sys_decode.c" unicode.c)
+target_include_directories(refsfs PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/include/refs" PRIVATE "${REFS}/librefs")
+target_compile_definitions(refsfs PUBLIC HAVE_SYS_IOCTL_H=1 HAVE_PTHREAD_H=1 _FILE_OFFSET_BITS=64)
+target_compile_options(refsfs PRIVATE -Wno-address-of-packed-member)

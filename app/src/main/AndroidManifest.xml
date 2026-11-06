@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <uses-feature android:name="android.hardware.usb.host" android:required="true" />
+    <permission android:name="dev.usbreader.INTERNAL_USB" android:protectionLevel="signature" />
+    <uses-permission android:name="dev.usbreader.INTERNAL_USB" />
+    <application android:theme="@style/AppTheme" android:label="U盘通读" android:icon="@drawable/ic_launcher"
+        android:allowBackup="false" android:fullBackupContent="false" android:dataExtractionRules="@xml/data_extraction_rules"
+        android:enableOnBackInvokedCallback="true" android:supportsRtl="true" tools:targetApi="33">
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter><action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" /></intent-filter>
+            <meta-data android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" android:resource="@xml/device_filter" />
+        </activity>
+    </application>
+</manifest>
